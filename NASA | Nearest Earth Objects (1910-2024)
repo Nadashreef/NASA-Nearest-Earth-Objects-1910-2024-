@@ -1,1 +1,140 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split, GridSearchCV
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
+
+df = pd.read_csv('/content/nearest-earth-objects(1910-2024).csv')
+
+df.head()
+
+df.shape
+
+df.isnull().sum()
+
+df = df.dropna()
+
+df.isnull().sum()
+
+df['orbiting_body'].nunique()
+
+df = df.drop(['name'], axis=1)
+
+df = df.drop(['orbiting_body'], axis=1)
+
+
+df.head()
+
+correlation = df.corr()
+print(correlation)
+
+plt.figure(figsize=(10,10))
+sns.heatmap(correlation, cbar=True, square=True, fmt='.1f', annot=True, annot_kws={'size':8}, cmap='Blues')
+
+df["is_hazardous"] = df["is_hazardous"].map({False: 0, True: 1})
+
+
+X = df.drop(['is_hazardous'], axis=1)
+Y = df['is_hazardous']
+
+x_train, x_test, y_train, y_test = train_test_split(X,Y, test_size = .3 , random_state = 3)
+
+print(x_train.nunique())
+
+
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(x_train)
+X_test_scaled = scaler.transform(x_test)
+
+**Logistic Regression Model**
+
+model = LogisticRegression()
+
+model.fit(X_train_scaled, y_train)
+y_pred_lr = model.predict(X_test_scaled)
+
+# Check accuracy
+accuracy_lr = accuracy_score(y_test, y_pred_lr)
+print("Accuracy:", accuracy_lr)
+
+**RandomForestClassifier Model**
+
+model_2 = RandomForestClassifier()
+
+model_2.fit(X_train_scaled, y_train)
+y_pred_rf = model_2.predict(X_test_scaled)
+
+accuracy_rf = accuracy_score(y_test, y_pred_rf)
+print("Accuracy:", accuracy_rf)
+
+**KNeighborsClassifier Model**
+
+model_3 = KNeighborsClassifier()
+
+model_3.fit(X_train_scaled, y_train)
+y_pred_knn = model_3.predict(X_test_scaled)
+
+accuracy_knn = accuracy_score(y_test, y_pred_knn)
+print("Accuracy:", accuracy_knn)
+
+**XGBClassifier Model**
+
+from xgboost import XGBClassifier
+
+xgb_model = XGBClassifier()
+xgb_model.fit(X_train_scaled, y_train)
+y_pred_xgb = xgb_model.predict(X_test_scaled)
+accuracy_xgb = accuracy_score(y_test, y_pred_xgb)
+print("XGBoost Accuracy:", accuracy_xgb)
+
+models = {
+    "Logistic Regression": LogisticRegression(),
+    "Random Forest": RandomForestClassifier(),
+    "KNN": KNeighborsClassifier()
+}
+
+for name, model in models.items():
+    model.fit(X_train_scaled, y_train)
+    y_pred = model.predict(X_test_scaled)
+    print(f"\n{name} Model Performance:")
+    print(classification_report(y_test, y_pred))
+    print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
+    
+    # AUC-ROC Score
+    y_prob = model.predict_proba(X_test_scaled)[:, 1]
+    auc_score = roc_auc_score(y_test, y_prob)
+    print(f"AUC-ROC Score: {auc_score:.4f}")
+    
+    # Plot ROC Curve
+    fpr, tpr, _ = roc_curve(y_test, y_prob)
+    plt.plot(fpr, tpr, label=f'{name} (AUC = {auc_score:.2f})')
+
+param_grid = {
+    'n_estimators': [50, 100, 200],
+    'max_depth': [None, 10, 20],
+    'min_samples_split': [2, 5, 10]
+}
+
+rf_grid = GridSearchCV(RandomForestClassifier(), param_grid, cv=5, scoring='f1', n_jobs=-1)
+rf_grid.fit(X_train_scaled, y_train)
+
+print("\nBest Random Forest Parameters:", rf_grid.best_params_)
+
+best_rf = rf_grid.best_estimator_
+y_pred_best = best_rf.predict(X_test_scaled)
+print("\nBest Random Forest Model Performance:")
+print(classification_report(y_test, y_pred_best))
+
+plt.plot([0, 1], [0, 1], 'k--')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve')
+plt.legend()
+plt.show()
 
